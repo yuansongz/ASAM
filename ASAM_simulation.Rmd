@@ -1,0 +1,282 @@
+---
+title: "ASAM_simulation"
+author: "yuansong zhao"
+date: "2025-03-21"
+output: html_document
+---
+
+```{r}
+setwd("D:/thesis/SAM+NI")
+source('ASAM_functions.R')
+```
+
+#No between-trial heterogeneity
+```{r}
+  # For reproducibility
+num_hist <- 4
+n <- c(100,100,150,150)
+mur <- c(5,5,5,5)
+sigma <- 3
+set.seed(555)
+Hist_r <- generate.data2(num_hist, n, mur, sigma) 
+print(Hist_r)
+
+e=0.4*3
+delta=0.3*3
+set.seed(275)
+mup <- c(5-delta,5-delta,5-delta,5-delta)
+Hist_p_typeI <-  generate.data2(num_hist, n, mup, sigma) 
+print(Hist_p_typeI)
+ 
+Hist_p_power = Hist_p_typeI
+Hist_p_power$mean=Hist_p_typeI$mean-e
+print(Hist_p_power)
+```
+
+#Substantial between-trial heterogeneity
+```{r}
+# For reproducibility
+num_hist <- 4
+n <- c(100,100,150,150)
+mur <- c(3.8,6.2,5,5)
+sigma <- 3
+v <- 0.3
+set.seed(1433)
+Hist_r2 <- generate.data2(num_hist, n, mur, sigma)
+print(Hist_r2)
+
+e=0.4*3
+delta=0.3*3
+set.seed(111)
+mup <- c(3.8-delta,6.2-delta,5-delta,5-delta) 
+Hist_p_typeI2 <- generate.data2(num_hist, n, mup, sigma)
+print(Hist_p_typeI2)
+
+Hist_p_power2 = Hist_p_typeI2
+Hist_p_power2$mean=Hist_p_typeI2$mean-e
+print(Hist_p_power2)
+```
+
+#Moderate between-trial heterogeneity
+```{r}
+num_hist <- 4
+n <- c(100,100,150,150)
+mur <- c(4.4,5.6,5,5)
+sigma <- 3
+set.seed(1200)
+Hist_r3 <- generate.data2(num_hist, n, mur, sigma)
+print(Hist_r3)
+
+e=0.4*3
+delta=0.3*3
+set.seed(5000)
+mup <- c(4.4-delta,5.6-delta,5-delta,5-delta) 
+Hist_p_typeI3 <- generate.data2(num_hist, n, mup, sigma)
+print(Hist_p_typeI3)
+
+Hist_p_power3 = Hist_p_typeI3
+Hist_p_power3$mean=Hist_p_typeI3$mean-e
+print(Hist_p_power3)
+```
+
+#cutoff value for csd=1
+```{r}
+Sys.time()
+start <- Sys.time()
+h.list=NULL
+methodC=c("NB","resample_w1","w1","w2","w3","w4","MAP50","MAPSAM",'CSA'
+          ) #by methods
+for (i in 1:length(methodC)){
+  oc = NI_weight_combined(method=methodC[i],
+                Hist_r=Hist_r, Hist_p=Hist_p_typeI, 
+          pcsd=1, rcsd=1, ntrial=10000,
+          np=75,nr=75,ne=150, mur=5, sigmap=3,sigmar=3, sigmae=3,
+          v=0, delta=0.3*3, lambda=0.25,cutoff= NULL
+              )
+  h.list=rbind(h.list,oc)
+}
+h.list
+h.list=h.list$cutoff
+print( Sys.time() - start )
+```
+```{r}
+h.list
+```
+```{r}
+# Combined runner function
+run_sim <- function(h_list, Hist_r, Hist_p, mur_values, v, delta, csd) {
+  methodC <- c("NB", "resample_w1", "w1", "w2", "w3", "w4", "MAP50", "MAPSAM", "CSA")
+  results_all <- do.call(rbind, lapply(mur_values, function(mur) {
+    do.call(rbind, lapply(seq_along(methodC), function(i) {
+      NI_weight_combined(
+        method  = methodC[i],
+        Hist_r  = Hist_r,
+        Hist_p  = Hist_p,
+        pcsd    = csd,
+        rcsd    = csd,
+        ntrial  = 10000,
+        np      = 75,
+        nr      = 75,
+        ne      = 150,
+        mur     = mur,
+        sigmap  = 3,
+        sigmar  = 3,
+        sigmae  = 3,
+        v       = v,
+        delta   = delta,
+        lambda  = 0.25,
+        cutoff  = h_list[i]
+      )
+    }))
+  }))
+  return(results_all)
+}
+
+# mu_R 
+mur_values <- seq(3.4, 6.6, by = 0.2)
+#difference between the treatment and placebo.
+delta_val <- 0.3 * 3
+#elipson value
+v_power <- 0.4 * 3
+```
+
+```{r}
+# Run all scenarios
+t_homo1  <- run_sim(h.list, Hist_r,  Hist_p_typeI,  mur_values, v = 0,       delta_val, 1)
+p_homo1  <- run_sim(h.list, Hist_r,  Hist_p_power,  mur_values, v = v_power, delta_val, 1)
+t_hete1  <- run_sim(h.list, Hist_r2, Hist_p_typeI2, mur_values, v = 0,       delta_val, 1)
+p_hete1  <- run_sim(h.list, Hist_r2, Hist_p_power2, mur_values, v = v_power, delta_val, 1)
+t_mhete1 <- run_sim(h.list, Hist_r3, Hist_p_typeI3, mur_values, v = 0,       delta_val, 1)
+p_mhete1 <- run_sim(h.list, Hist_r3, Hist_p_power3, mur_values, v = v_power, delta_val, 1)
+```
+
+```{r}
+Sys.time()
+start <- Sys.time()
+p_homo1  <- run_sim(h.list, Hist_r,  Hist_p_power,  mur_values, v = v_power, delta_val, 1)
+t_hete1  <- run_sim(h.list, Hist_r2, Hist_p_typeI2, mur_values, v = 0,       delta_val, 1)
+p_hete1  <- run_sim(h.list, Hist_r2, Hist_p_power2, mur_values, v = v_power, delta_val, 1)
+print( Sys.time() - start )
+```
+
+
+```{r}
+Sys.time()
+start <- Sys.time()
+t_mhete1 <- run_sim(h.list, Hist_r3, Hist_p_typeI3, mur_values, v = 0,       delta_val, 1)
+p_mhete1 <- run_sim(h.list, Hist_r3, Hist_p_power3, mur_values, v = v_power, delta_val, 1)
+print( Sys.time() - start )
+```
+
+
+
+```{r}
+write_xlsx(t_homo1, path = "D:/thesis/SAM+NI/simu_0321/t_homo1.xlsx")
+write_xlsx(p_homo1, path = "D:/thesis/SAM+NI/simu_0321/p_homo1.xlsx")
+write_xlsx(t_hete1, path = "D:/thesis/SAM+NI/simu_0321/t_hete1.xlsx")
+write_xlsx(p_hete1, path = "D:/thesis/SAM+NI/simu_0321/p_hete1.xlsx")
+write_xlsx(t_mhete1, path = "D:/thesis/SAM+NI/simu_0321/t_mhete1.xlsx")
+write_xlsx(p_mhete1, path = "D:/thesis/SAM+NI/simu_0321/p_mhete1.xlsx")
+```
+
+
+```{r}
+# Add labels
+label_results <- function(df, type_label, heter_label) {
+  df$type <- type_label
+  df$heter <- heter_label
+  return(df)
+}
+t_homo1  <- label_results(t_homo1,  "Type I error", "No between-trial heterogeneity")
+p_homo1  <- label_results(p_homo1,  "Power",        "No between-trial heterogeneity")
+t_hete1  <- label_results(t_hete1,  "Type I error", "Substantial between-trial heterogeneity")
+p_hete1  <- label_results(p_hete1,  "Power",        "Substantial between-trial heterogeneity")
+t_mhete1 <- label_results(t_mhete1, "Type I error", "Moderate between-trial heterogeneity")
+p_mhete1 <- label_results(p_mhete1, "Power",        "Moderate between-trial heterogeneity")
+
+```
+
+#generate plot
+```{r}
+library(ggplot2)
+Project2=rbind(t_homo1,p_homo1,t_mhete1,p_mhete1,t_hete1,p_hete1)
+Project2$Type <- factor(Project2$type, levels = c("Type I error", "Power"))
+Project2$heter <- factor(Project2$heter, levels = c('No between-trial heterogeneity',
+                                                    'Moderate between-trial heterogeneity',
+                                                    'Substantial between-trial heterogeneity'))
+```
+
+```{r}
+S1<- Project2[Project2$method %in% c("w1","w2","w3","w4"), ]
+
+theme_set(theme_bw()+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_blank()))
+
+F1=ggplot(S1, aes(x =mur, y = pwr, group = method) ) +labs(x = expression(mu[R]) , y = NULL)  + 
+    geom_line(aes(colour=method ,linetype=method)) +        
+    geom_point(aes(colour=method ,shape=method))  +
+   # Add horizontal line for Type I error at 0.0025
+  geom_hline(data = subset(S1, type == "Type I error"), aes(yintercept = 0.0025),  color = 'black') +
+  # Add horizontal line for Power at 0.71
+  geom_hline(data = subset(S1, type == "Power"), aes(yintercept = 0.71), color ='black') +
+   # Add vertical lines based on different heterogeneity levels
+  geom_vline(data = subset(S1, heter == "No between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") + 
+  geom_vline(data = subset(S1, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S1, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 4.4), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S1, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 5.6), color = 'grey', linetype = "dashed") +
+   geom_vline(data = subset(S1, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S1, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 3.8), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S1, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 6.2), color = 'grey', linetype = "dashed") +
+  
+    scale_shape_manual(values=c( 2,16,15,17)) +                  # Change shapes
+    scale_linetype_manual(values=c(4,3,2,5))  +       # Change linetypes
+    scale_color_manual(values=c('blue','goldenrod2','limegreen','red'))+
+    facet_grid(factor(type)~heter,scales="free", space="free_x")+ theme(legend.position="bottom")+
+  guides(colour = guide_legend(title = NULL), 
+         linetype = guide_legend(title = NULL), 
+         shape = guide_legend(title = NULL))  # Remove legend titles
+F1
+```
+
+```{r}
+# Filter the dataset as before
+S2 <- Project2[Project2$method %in% c("w1", "resample_w1", "MAP50",'CSA'), ]
+
+# Relabel 'w1' to 'ASAM_D' and 'resample_w1' to 'ASAM_S'
+S2$method <- factor(S2$method, levels = c("w1", "resample_w1", "MAP50",'CSA'), 
+                    labels = c("ASAM_D", "ASAM_S", "MAP50",'CSA'))
+# Set the theme
+theme_set(theme_bw() + theme(panel.grid.major = element_blank(), 
+                             panel.grid.minor = element_blank(), 
+                             panel.background = element_blank()))
+# Plot with relabeled methods
+F2 = ggplot(S2, aes(x = mur, y = pwr, group = method)) + 
+  labs(x = expression(mu[R]), y = NULL) + 
+  geom_line(aes(colour = method, linetype = method)) +        
+  geom_point(aes(colour = method, shape = method)) +
+  
+   # Add horizontal line for Type I error at 0.0025
+  geom_hline(data = subset(S2, type == "Type I error"), aes(yintercept = 0.0025),  color = 'black') +
+  # Add horizontal line for Power at 0.71
+  geom_hline(data = subset(S2, type == "Power"), aes(yintercept = 0.71), color ='black') +
+   # Add vertical lines based on different heterogeneity levels
+  geom_vline(data = subset(S2, heter == "No between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") + 
+  geom_vline(data = subset(S2, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S2, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 4.4), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S2, heter == "Moderate between-trial heterogeneity"), aes(xintercept = 5.6), color = 'grey', linetype = "dashed") +
+   geom_vline(data = subset(S2, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 5), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S2, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 3.8), color = 'grey', linetype = "dashed") +
+    geom_vline(data = subset(S2, heter == "Substantial between-trial heterogeneity"), aes(xintercept = 6.2), color = 'grey', linetype = "dashed") +
+  
+  scale_shape_manual(values = c(2,  15, 17,8)) +  # Change shapes
+  scale_linetype_manual(values = c(4,  2, 5,1)) +  # Change linetypes
+  scale_color_manual(values = c('blue', 'red',  'goldenrod2','darkgreen')) +
+  
+  facet_grid(factor(type) ~ heter, scales = "free", space = "free_x") + 
+  theme(legend.position = "bottom") +
+  
+  guides(colour = guide_legend(title = NULL), 
+         linetype = guide_legend(title = NULL), 
+         shape = guide_legend(title = NULL))  # Remove legend titles
+
+F2
+```
